@@ -255,14 +255,14 @@ void squere_Matrix_real::swap_col(int i, int j) {
 	}
 }  
 
-float squere_Matrix_real::determinant() {
+float squere_Matrix_real::determinant_1() {
 	for (int i{}; i < n_ - 1; i++) {   //в каждой строке ищем ведущий элемент
 		auto max_el_iter = std::max_element(matrix_.cbegin() + n_ * i + i, matrix_.cbegin() + n_ * i + n_, [](float a, float b) {return std::abs(a) < std::abs(b); });
 		int max_el_index = std::distance(matrix_.cbegin() + n_ * i, max_el_iter);     //i-й столбец мы будем умножать на отношение i-го элемента и ведущего, чтобы получить 0 на i-й позиции.
 		if (max_el_index != i) this->swap_col(i, max_el_index);    //если ведущий элемент не на диагонали - меняем столбцы. 
  		this->transpose();   //транспонируем для реализации преобразования столбцов через непрерывные блоки, чтобы использовать SIMD. строка - это непрерывный блок
 		for (int j{ i + 1 }; j < n_; j++) {    //текущий столбец мы не меняем, с помощью него меняем все остальные
-			if (matrix_[n_ * i + i] < 1e-7) continue;    //если ведущий слишокм маленький, считаем, что весь столбец обнулен
+			if (matrix_[n_ * i + i] < 1e-9) return 0;    //если ведущий слишокм маленький, считаем, что весь столбец обнулен
 			float rat = matrix_[n_ * j + i] / matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
 			if (n_ - i >= 8) {    //условность только для выбора SIMD
 				int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
@@ -301,6 +301,65 @@ float squere_Matrix_real::determinant() {
 		this->transpose();
 	}
     this->show();
+	float det = 1.;
+	for (int i{}; i < n_; i++) {
+		det *= matrix_[n_ * i + i];
+	}
+	return det;
+
+} 
+
+float squere_Matrix_real::determinant_2() {
+	std::vector<float> i_element_row(n_, 0.);
+
+	for (int i{}; i < n_-1; i++) {
+		for (int j{}; j < n_-i; j++) {
+			i_element_row[i + j] = matrix_[n_ * i + i + n_ * j];  //j задает номер строки
+		}
+
+		auto max_element_row_iter = std::max_element(i_element_row.begin() + i, i_element_row.end(), [](float a, float b) {return std::abs(a) < std::abs(b); });
+		int max_element_row_num = std::distance(i_element_row.begin(), max_element_row_iter);
+		this->swap_row(i, max_element_row_num);   //привели к ведущему элементу.
+
+		for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
+			/*if (matrix_[n_ * i + i] < 1e-4) break; */   //если ведущий слишокм маленький, считаем, что весь столбец обнулен
+			float rat = matrix_[n_ * j + i] / matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
+			if (n_ - i >= 8) {    //условность только для выбора SIMD
+				int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
+				int remainder = (n_ - i) % 8;   //сколько значений остается
+				for (int k{}; k < count; k++) {
+					__m256 vec_a = _mm256_loadu_ps(&matrix_[n_ * i + i + 8 * k]);
+					__m256 multiplier = _mm256_set1_ps(rat);
+					__m256 vec_b = _mm256_loadu_ps(&matrix_[n_ * j + i + 8 * k]);
+					__m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
+					_mm256_storeu_ps(&matrix_[n_ * j + i + 8 * k], vec_c);
+				}
+				for (int k{}; k < remainder; k++) {
+					matrix_[n_ * j + i + 8 * count + k] -= matrix_[n_ * i + i + 8 * count + k] * rat;
+				}
+			}
+			else if ((n_ - i >= 4) && (n_ - i < 8)) {
+				int count = (n_ - i) / 4;
+				int remainder = (n_ - i) % 4;
+				for (int k{}; k < count; k++) {
+					__m128 vec_a = _mm_loadu_ps(&matrix_[n_ * i + i + 4 * k]);
+					__m128 multiplier = _mm_set_ps1(rat);
+					__m128 vec_b = _mm_loadu_ps(&matrix_[n_ * j + i + 4 * k]);
+					__m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
+					_mm_storeu_ps(&matrix_[n_ * j + i + 4 * k], vec_c);
+				}
+				for (int k{}; k < remainder; k++) {
+					matrix_[n_ * j + i + 4 * count + k] -= matrix_[n_ * i + i + 4 * count + k] * rat;
+				}
+			}
+			else {
+				for (int k{ i }; k < n_; k++) {
+					matrix_[n_ * j + k] -= matrix_[n_*i + k] * rat;
+				}
+			}
+			std::cout << "\n";
+		}
+	}
 	float det = 1.;
 	for (int i{}; i < n_; i++) {
 		det *= matrix_[n_ * i + i];

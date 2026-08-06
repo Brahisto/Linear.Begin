@@ -36,7 +36,8 @@ public:
 
     const squere_Matrix_real transpose_new() const;
     void transpose();
-    float determinant();
+    float determinant_1();
+    float determinant_2();
     squere_Matrix_real reverse();
 
     void swap_row(int, int);
