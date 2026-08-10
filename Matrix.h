@@ -51,14 +51,15 @@ public:
     void init_random();
 
     squere_Matrix_real except_ij_row_col(int, int) const;
-
-    const std::vector<squere_Matrix_real> LU_decomposition();
     size_t get_size() const {return n_;}
     float get_det() {return determinant;}
 
     const float * first_el() const {return &matrix_[0];}
     float * first_el_non_const() {return &matrix_[0];}
     start_pos first_el_iter() {return matrix_.begin();}
+
+    squere_Matrix_real construct_transform_matrix(int, int, float);
+    std::vector<squere_Matrix_real> LU_decomposition();
 
     void show() const;
 };
