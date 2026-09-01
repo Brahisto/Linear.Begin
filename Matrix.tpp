@@ -93,7 +93,7 @@ squere_Matrix_real::squere_Matrix_real(int n, matrix_type type, float value) noe
 squere_Matrix_real::squere_Matrix_real(int n, std::initializer_list<float> values) noexcept {
     if (n > 0) {
         n_ = n;
-        matrix_.resize(n*n, 0);
+        matrix_.assign(n*n, 0);
         matrix_ = values;
     }
     else {
@@ -447,15 +447,13 @@ squere_Matrix_real squere_Matrix_real::construct_transform_matrix(int i, int j, 
 }
 
 std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
-	squere_Matrix_real U = *this;
-	squere_Matrix_real S(n_, matrix_type::IDENTITY);
-	
+    std::vector<squere_Matrix_real> a{squere_Matrix_real (n_, matrix_type::IDENTITY), *this};
 	
 	std::vector<float> i_element_row(n_, 0.);
 
 	for (int i{}; i < n_ - 1; i++) {
 		for (int j{}; j < n_ - i; j++) {
-			i_element_row[i + j] = U.matrix_[n_ * i + i + n_ * j];  //j задает номер строки
+			i_element_row[i + j] = (a[1]).matrix_[n_ * i + i + n_ * j];  //j задает номер строки
 		}
 
 		auto max_element_row_iter = std::max_element(i_element_row.begin() + i, i_element_row.end(), [](float a, float b) {return std::abs(a) < std::abs(b); });
@@ -466,48 +464,45 @@ std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
 		}
 
 		for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
-			if (std::abs(U.matrix_[n_ * i + i]) < 1e-11) continue;//если ведущий слишокм маленький, считаем, что весь столбец обнулен
-			float rat = U.matrix_[n_ * j + i] / U.matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
-			S = (U.construct_transform_matrix(j, i, -rat)) * S;
+			if (std::abs((a[1]).matrix_[n_ * i + i]) < 1e-11) continue;//если ведущий слишокм маленький, считаем, что весь столбец обнулен
+			float rat = (a[1]).matrix_[n_ * j + i] / (a[1]).matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
+			a[0] = ((a[1]).construct_transform_matrix(j, i, -rat)) * a[0];
 			if (n_ - i >= 8) {    //условность только для выбора SIMD
 				int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
 				int remainder = (n_ - i) % 8;   //сколько значений остается
 				for (int k{}; k < count; k++) {
-					__m256 vec_a = _mm256_loadu_ps(&(U.matrix_[n_ * i + i + 8 * k]));
+					__m256 vec_a = _mm256_loadu_ps(&((a[1]).matrix_[n_ * i + i + 8 * k]));
 					__m256 multiplier = _mm256_set1_ps(rat);
-					__m256 vec_b = _mm256_loadu_ps(&(U.matrix_[n_ * j + i + 8 * k]));
+					__m256 vec_b = _mm256_loadu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]));
 					__m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
-					_mm256_storeu_ps(&(U.matrix_[n_ * j + i + 8 * k]), vec_c);
+					_mm256_storeu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]), vec_c);
 				}
 				for (int k{}; k < remainder; k++) {
-					U.matrix_[n_ * j + i + 8 * count + k] -= U.matrix_[n_ * i + i + 8 * count + k] * rat;
+					(a[1]).matrix_[n_ * j + i + 8 * count + k] -= (a[1]).matrix_[n_ * i + i + 8 * count + k] * rat;
 				}
 			}
 			else if ((n_ - i >= 4) && (n_ - i < 8)) {
 				int count = (n_ - i) / 4;
 				int remainder = (n_ - i) % 4;
 				for (int k{}; k < count; k++) {
-					__m128 vec_a = _mm_loadu_ps(&(U.matrix_[n_ * i + i + 4 * k]));
+					__m128 vec_a = _mm_loadu_ps(&((a[1]).matrix_[n_ * i + i + 4 * k]));
 					__m128 multiplier = _mm_set_ps1(rat);
-					__m128 vec_b = _mm_loadu_ps(&(U.matrix_[n_ * j + i + 4 * k]));
+					__m128 vec_b = _mm_loadu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]));
 					__m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
-					_mm_storeu_ps(&(U.matrix_[n_ * j + i + 4 * k]), vec_c);
+					_mm_storeu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]), vec_c);
 				}
 				for (int k{}; k < remainder; k++) {
-					U.matrix_[n_ * j + i + 4 * count + k] -= U.matrix_[n_ * i + i + 4 * count + k] * rat;
+					(a[1]).matrix_[n_ * j + i + 4 * count + k] -= (a[1]).matrix_[n_ * i + i + 4 * count + k] * rat;
 				}
 			}
 			else {
 				for (int k{ i }; k < n_; k++) {
-					U.matrix_[n_ * j + k] -= U.matrix_[n_ * i + k] * rat;
+					(a[1]).matrix_[n_ * j + k] -= (a[1]).matrix_[n_ * i + k] * rat;
 				}
 			}
 			std::cout << "\n";
 		}
 	}
-	squere_Matrix_real L = S.reverse();
-	std::vector<squere_Matrix_real> a{squere_Matrix_real (n_), squere_Matrix_real (n_)};
-	a[0] = L;
-	a[1] = U;
+	a[0] = (a[0]).reverse();
     return a;
 }
