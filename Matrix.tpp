@@ -448,25 +448,10 @@ squere_Matrix_real squere_Matrix_real::construct_transform_matrix(int i, int j, 
 
 std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
     std::vector<squere_Matrix_real> a{squere_Matrix_real (n_, matrix_type::IDENTITY), *this};
-	
-	std::vector<float> i_element_row(n_, 0.);
-
 	for (int i{}; i < n_ - 1; i++) {
-		for (int j{}; j < n_ - i; j++) {
-			i_element_row[i + j] = (a[1]).matrix_[n_ * i + i + n_ * j];  //j задает номер строки
-		}
-
-		auto max_element_row_iter = std::max_element(i_element_row.begin() + i, i_element_row.end(), [](float a, float b) {return std::abs(a) < std::abs(b); });
-		int max_element_row_num = std::distance(i_element_row.begin(), max_element_row_iter);
-		if (i != max_element_row_num) {
-			this->swap_row(i, max_element_row_num);
-			//привели к ведущему элементу.
-		}
-
 		for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
 			if (std::abs((a[1]).matrix_[n_ * i + i]) < 1e-11) continue;//если ведущий слишокм маленький, считаем, что весь столбец обнулен
 			float rat = (a[1]).matrix_[n_ * j + i] / (a[1]).matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
-			a[0] = ((a[1]).construct_transform_matrix(j, i, -rat)) * a[0];
 			if (n_ - i >= 8) {    //условность только для выбора SIMD
 				int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
 				int remainder = (n_ - i) % 8;   //сколько значений остается
@@ -476,9 +461,16 @@ std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
 					__m256 vec_b = _mm256_loadu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]));
 					__m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
 					_mm256_storeu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]), vec_c);
+
+                    vec_a = _mm256_loadu_ps(&((a[0]).matrix_[n_ * i + i + 8 * k]));
+					multiplier = _mm256_set1_ps(rat);
+					vec_b = _mm256_loadu_ps(&((a[0]).matrix_[n_ * j + i + 8 * k]));
+					vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
+					_mm256_storeu_ps(&((a[0]).matrix_[n_ * j + i + 8 * k]), vec_c);
 				}
 				for (int k{}; k < remainder; k++) {
 					(a[1]).matrix_[n_ * j + i + 8 * count + k] -= (a[1]).matrix_[n_ * i + i + 8 * count + k] * rat;
+                    (a[0]).matrix_[n_ * j + i + 8 * count + k] -= (a[0]).matrix_[n_ * i + i + 8 * count + k] * rat;
 				}
 			}
 			else if ((n_ - i >= 4) && (n_ - i < 8)) {
@@ -490,19 +482,27 @@ std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
 					__m128 vec_b = _mm_loadu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]));
 					__m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
 					_mm_storeu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]), vec_c);
+
+                    vec_a = _mm_loadu_ps(&((a[0]).matrix_[n_ * i + i + 4 * k]));
+					multiplier = _mm_set_ps1(rat);
+					vec_b = _mm_loadu_ps(&((a[0]).matrix_[n_ * j + i + 4 * k]));
+					vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
+					_mm_storeu_ps(&((a[0]).matrix_[n_ * j + i + 4 * k]), vec_c);
 				}
 				for (int k{}; k < remainder; k++) {
 					(a[1]).matrix_[n_ * j + i + 4 * count + k] -= (a[1]).matrix_[n_ * i + i + 4 * count + k] * rat;
+                    (a[0]).matrix_[n_ * j + i + 4 * count + k] -= (a[0]).matrix_[n_ * i + i + 4 * count + k] * rat;
 				}
 			}
 			else {
 				for (int k{ i }; k < n_; k++) {
 					(a[1]).matrix_[n_ * j + k] -= (a[1]).matrix_[n_ * i + k] * rat;
 				}
+                for (int k{}; k < n_; k++) {
+					(a[0]).matrix_[n_ * j + k] -= (a[0]).matrix_[n_ * i + k] * rat;
+				}
 			}
-			std::cout << "\n";
 		}
 	}
-	a[0] = (a[0]).reverse();
     return a;
 }
