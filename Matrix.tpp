@@ -162,80 +162,6 @@ const squere_Matrix_real squere_Matrix_real::transpose_new() const {
     return current;
 }
 
-squere_Matrix_real squere_Matrix_real::operator*(const squere_Matrix_real & matrix2) noexcept {
-    squere_Matrix_real current(this->get_size());
-    if (this->get_size() != matrix2.get_size()) {std::cout << "invalid size...\n"; return current;}
-    squere_Matrix_real m2(matrix2.transpose_new());
-
-    if (this->get_size() >= 8) {
-        int count = n_ / 8;
-        int r =  n_ % 8;
-
-        for (int c{}; c < n_;c++) {
-            for (int s{}; s < n_; s++) {
-                float sum{};
-                for (int i{}; i< count; i++) {
-                    float * res_p = new float[8];
-                    __m256 vec_a = _mm256_loadu_ps(this->first_el() + c*n_ + 8*i);
-                    __m256 vec_b = _mm256_loadu_ps(m2.first_el() + s * n_ + 8*i);
-
-                    __m256 result = _mm256_mul_ps(vec_a, vec_b);
-                    
-                    _mm256_storeu_ps(res_p, result);
-
-                    for (int j{}; j < 8; j++) sum += *(res_p + j);
-                    delete[] res_p;
-
-                }
-                for (int j{}; j < r; j++) {
-                    sum += matrix_[8*count + c*n_ + j] * (*(m2.first_el() + 8*count + s*n_ + j));
-                }
-                *(current.first_el_iter() + n_ * c + s) = sum;
-            }   
-        }
-    }
-    else if (this->get_size() >= 4 && this->get_size() < 8) {
-        int count = n_ / 4;
-        int r =  n_ % 4;
-
-        for (int c{}; c < n_;c++) {
-            float sum{};
-            for (int s{}; s < n_; s++) {
-                sum = 0.;
-                for (int i{}; i< count; i++) {
-                    float * res_p = new float[4];
-                    __m128 vec_a = _mm_loadu_ps(this->first_el() + c*n_ + 4*i);
-                    __m128 vec_b = _mm_loadu_ps(m2.first_el() + s * n_ + 4*i);
-
-                    __m128 result = _mm_mul_ps(vec_a, vec_b);
-                    
-                    _mm_storeu_ps(res_p, result);
-
-                    for (int j{}; j < 4; j++) sum += *(res_p + j);
-                    delete[] res_p;
-                }
-                for (int j{}; j < r; j++) {
-                    sum += matrix_[4*count + c*n_ + j] * (*(m2.first_el() + 4*count + s*n_ + j));
-                }
-                *(current.first_el_iter() + n_ * c + s) = sum;
-            }   
-        }
-    }
-    else {
-        for (int s{}; s < n_; s++) {
-            float sum{};
-            for (int i{}; i < n_; i++) {
-                sum = 0.;
-                for (int j{}; j < n_; j++) {
-                    sum += matrix_[n_*s + j] * (*(m2.first_el() + n_*i + j));
-                }
-                *(current.first_el_iter() + n_*s + i) = sum;
-            }
-        }
-    }
-    return current;
-}
-
 const float & squere_Matrix_real::operator()(int i, int j) const {
     return this->matrix_[n_*i + j];
 }
@@ -261,12 +187,12 @@ void squere_Matrix_real::transpose() {
 
 
 void squere_Matrix_real::swap_row(int i, int j) {
-	std::swap_ranges(matrix_.begin() + n_ * i, matrix_.begin() + n_ * i + n_, matrix_.begin() + n_ * j);
+	std::swap_ranges(matrix_.begin() + n_ * (i-1), matrix_.begin() + n_ * (i-1) + n_, matrix_.begin() + n_ * (j-1));
 }
 
 void squere_Matrix_real::swap_col(int i, int j) {
 	for (int row = 0; row < n_; ++row) {
-		std::swap(matrix_[n_ * row + i], matrix_[n_ * row + j]);
+		std::swap(matrix_[n_ * row + i-1], matrix_[n_ * row + j-1]);
 	}
 }  
 
@@ -447,6 +373,7 @@ squere_Matrix_real squere_Matrix_real::construct_transform_matrix(int i, int j, 
 }
 
 std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
+
     std::vector<squere_Matrix_real> a{squere_Matrix_real (n_, matrix_type::IDENTITY), *this};
 	for (int i{}; i < n_ - 1; i++) {
 		for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
@@ -506,3 +433,189 @@ std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
 	}
     return a;
 }
+
+rectang_Matrix::rectang_Matrix(int n, int m) noexcept {
+    if (n > 0 && m > 0) {
+        matrix_.assign(m*n, 0);
+        n_ = n; m_ = m;
+        type = matrix_type::RECTANG;
+    }
+    else std::cout << "invalid size.../n";
+}
+
+rectang_Matrix::rectang_Matrix(int n, int m, std::initializer_list<float> values) noexcept {
+    if (n > 0 && m > 0) {
+        matrix_.assign(m*n, 0);
+        int count{};
+        count = (m*n > values.size() ? values.size() : m*n);
+        for (int i{}; i < count; i++) {
+            *(matrix_.begin() + i) = *(values.begin() + i);
+        }
+        n_ = n; m_ = m;
+        type = matrix_type::RECTANG;
+    }
+    else std::cout << "invalid size.../n";
+}
+
+
+rectang_Matrix rectang_Matrix::operator*(const rectang_Matrix & right) noexcept {
+    rectang_Matrix result(n_, right.n_);
+
+    if (m_ = right.m_) {
+        if (m_ >= 8) {
+            int count = m_ / 8;
+            int remainder = m_ % 8;
+            float sum = 0;
+            float * res = new float[8];
+
+            for (int i{}; i < n_;i++) {
+                for (int k{}; k < right.n_;k++) {
+                    for (int j{}; j < count; j++) {
+                        __m256 vec_a = _mm256_loadu_ps(this->first_el() + m_*i + j*8);
+                        __m256 vec_b = _mm256_loadu_ps(right.first_el() + right.m_*k + j*8);
+                        __m256 multiply = _mm256_mul_ps(vec_a, vec_b);
+                        _mm256_storeu_ps(res, multiply);
+                        for (int q{}; q < 8; q++) sum += *(res + q);
+                    }
+
+                    for (int j{}; j < remainder; j++) {
+                        sum += matrix_[m_*i + count*8 + j] * right.matrix_[right.m_ * k + count*8 + j];
+                    }
+                    result.matrix_[right.n_*i + k] = sum;
+                }
+            }
+            delete[] res;
+        }
+
+        else if (m_ >= 4 && m_ < 8) {
+            int count = m_ / 4;
+            int remainder = m_ % 4;
+            float sum = 0;
+            float * res = new float[4];
+
+            for (int i{}; i < n_;i++) {
+                for (int k{}; k < right.n_;k++) {
+                    for (int j{}; j < count; j++) {
+                        __m128 vec_a = _mm_loadu_ps(this->first_el() + m_*i + j*4);
+                        __m128 vec_b = _mm_loadu_ps(right.first_el() + right.m_*k + j*4);
+                        __m128 multiply = _mm_mul_ps(vec_a, vec_b);
+                        _mm_storeu_ps(res, multiply);
+                        for (int q{}; q < 4; q++) sum += *(res + q);
+                    }
+
+                    for (int j{}; j < remainder; j++) {
+                        sum += matrix_[m_*i + count*4 + j] * right.matrix_[right.m_ * k + count*4 + j];
+                    }
+                    result.matrix_[right.n_*i + k] = sum;
+                }
+            }
+            delete[] res;
+        }
+
+        else {
+            float sum{};
+            for (int i{}; i < n_; i++) {
+                for (int j{}; j < right.n_; j++) {
+                    sum = 0;
+                    for (int k{}; k < m_; k++) {
+                        sum += matrix_[m_ * i + k] * right.matrix_[right.m_ * j + k];
+                    }
+                    result.matrix_[right.n_ * i + j] = sum;
+                }
+            }
+        }
+    }
+
+    else std::cout << "impossible to multiplicate...\n";
+
+    return result;
+}
+
+rectang_Matrix rectang_Matrix::operator+(const rectang_Matrix & matrix2) noexcept {
+    rectang_Matrix current(*this);
+    
+    if (this->get_size() == matrix2.get_size()) {
+        int count = n_*m_ / 8;    //используем _m256, вмещающим 8 int and 8 float
+
+        int remainder = (n_*m_) % 8;
+
+        for (int i{}; i < count; i++) {
+            __m256 vec_a = _mm256_loadu_ps(this->first_el() + 8*i);
+            __m256 vec_b = _mm256_loadu_ps(matrix2.first_el() + 8*i);
+
+            __m256 result = _mm256_add_ps(vec_a, vec_b);
+
+            _mm256_storeu_ps(current.first_el_non_const() + 8*i, result);
+        }
+    
+        for (int j{}; j < remainder; j++) {
+            *(current.first_el_non_const() + 8*count + j) = *(this->first_el() + 8*count + j) + *(matrix2.first_el() + 8*count + j);
+        }
+    }
+
+    return current;
+}
+
+rectang_Matrix rectang_Matrix::operator-(const rectang_Matrix & matrix2) noexcept {
+    rectang_Matrix current(*this);
+    
+    if (this->get_size() == matrix2.get_size()) {
+        int count = n_*m_ / 8;    //используем _m256, вмещающим 8 int and 8 float
+
+        int remainder = (n_*m_) % 8;
+
+        for (int i{}; i < count; i++) {
+            __m256 vec_a = _mm256_loadu_ps(this->first_el() + 8*i);
+            __m256 vec_b = _mm256_loadu_ps(matrix2.first_el() + 8*i);
+
+            __m256 result = _mm256_sub_ps(vec_a, vec_b);
+
+            _mm256_storeu_ps(current.first_el_non_const() + 8*i, result);
+        }
+    
+        for (int j{}; j < remainder; j++) {
+            *(current.first_el_non_const() + 8*count + j) = *(this->first_el() + 8*count + j) - *(matrix2.first_el() + 8*count + j);
+        }
+    }
+    return current;
+}
+
+
+const rectang_Matrix rectang_Matrix::transpose_new() const {
+    rectang_Matrix current(m_, n_);
+    for (int i{}; i < n_; i++) {
+        for (int j{}; j < m_; j++) {
+            current.matrix_[n_*j + i] = matrix_[m_*i + j];
+        }
+    }
+    return current;
+}
+
+const float & rectang_Matrix::operator()(int i, int j) const {
+    return this->matrix_[m_*i + j];
+}
+
+void rectang_Matrix::show() const {
+    for (int i{};i < n_; i++) {
+        for (int j{}; j < m_; j++) {
+            std::cout << std::setw(15) << matrix_[m_*i + j] << " ";
+        }
+        std::cout << "\n";
+    }
+    std::cout << "\n";
+}
+
+
+void rectang_Matrix::swap_row(int i, int j) {
+	std::swap_ranges(matrix_.begin() + m_ * (i -1), matrix_.begin() + m_ * (i-1) + m_, matrix_.begin() + m_ * (j-1));
+}
+
+void rectang_Matrix::swap_col(int i, int j) {
+    for (int row = 0; row < n_; ++row) {
+		std::swap(matrix_[m_ * row + i - 1], matrix_[m_ * row + j - 1]);
+	}
+}
+
+
+
+
