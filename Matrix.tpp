@@ -1,34 +1,50 @@
 
 
-squere_Matrix_real::squere_Matrix_real(int n) noexcept {
+Matrix::Matrix(int n) noexcept {
+    is_compute_det = false;
     if (n > 0) {
         matrix_.assign(n*n, 0);
         n_ = n;
+        m_ = n;
+        type_figure = matrix_type::SQUERE;
+        type_struct = matrix_type::COMMON;
+        determinant = 0;
     }
     else {
         n_ = 0;
+        m_ = 0;
         std::cout << "The matrix size is 0. Try 'reset' with valid data...\n ";
     }
 }
 
-squere_Matrix_real::squere_Matrix_real(int n, float value) noexcept {
+Matrix::Matrix(int n, float value) noexcept {
+    is_compute_det = false;
     if (n > 0) {
         matrix_.assign(n*n, value);
         n_ = n;
+        m_ = n;
+        type_figure = matrix_type::SQUERE;
+        type_struct = matrix_type::COMMON;
+        determinant = 0;
     }
     else {
         n_ = 0;
+        m_ = 0;
         std::cout << "The matrix size is 0. Try 'reset' with valid data...\n ";
     }
 }
 
-squere_Matrix_real::squere_Matrix_real(int n, matrix_type type) noexcept {
+Matrix::Matrix(int n, matrix_type type) noexcept {
+    is_compute_det = false;
     if (n > 0) {
         matrix_.assign(n*n, 0);
         n_ = n;
+        m_ = n;
+        type_figure = matrix_type::SQUERE;
     }
     else {
         n_ = 0;
+        m_ = 0;
         std::cout << "The matrix size is 0. Try 'reset' with valid data...\n ";
     }
 
@@ -39,6 +55,7 @@ squere_Matrix_real::squere_Matrix_real(int n, matrix_type type) noexcept {
                     matrix_[n_*i + j] = 1;
                 }
             }
+            type_struct = matrix_type::LOW_TRIANG;
             break;
 
         case matrix_type::UP_TRIANG:
@@ -47,23 +64,31 @@ squere_Matrix_real::squere_Matrix_real(int n, matrix_type type) noexcept {
                     matrix_[n_*i + n_ - j - 1] = 1;
                 }
             }
+            type_struct = matrix_type::UP_TRIANG;
             break;
 
         case matrix_type::IDENTITY:
             for (int i{};i < n_; i++) matrix_[n*i + i] = 1;
+            type_struct = matrix_type::IDENTITY;
             break;
         case matrix_type::ZERO:
             for (auto &i : matrix_) i = 0;
+            type_struct = matrix_type::ZERO;
+            break;
     }
 }
 
-squere_Matrix_real::squere_Matrix_real(int n, matrix_type type, float value) noexcept {
+Matrix::Matrix(int n, matrix_type type, float value) noexcept {
+    is_compute_det = false;
     if (n > 0) {
         matrix_.assign(n*n, 0);
         n_ = n;
+        m_ = n;
+        type_figure = matrix_type::SQUERE;
     }
     else {
         n_ = 0;
+        m_ = 0;
         std::cout << "The matrix size is 0. Try 'reset' with valid data...\n ";
     }
 
@@ -74,6 +99,7 @@ squere_Matrix_real::squere_Matrix_real(int n, matrix_type type, float value) noe
                     matrix_[n_*i + j] = value;
                 }
             }
+            type_struct = matrix_type::LOW_TRIANG;
             break;
 
         case matrix_type::UP_TRIANG:
@@ -82,368 +108,50 @@ squere_Matrix_real::squere_Matrix_real(int n, matrix_type type, float value) noe
                     matrix_[n_*i + n_ - j - 1] = value;
                 }
             }
+            type_struct = matrix_type::UP_TRIANG;
             break;
 
-        case matrix_type::IDENTITY:
-            for (int i{};i < n_; i++) matrix_[n_*i + i] = value;
+        case matrix_type::DIAGONAL:
+            for (int i{};i < n_; i++) matrix_[n*i + i] = value;
+            type_struct = matrix_type::DIAGONAL;
             break;
     }
 }
 
-squere_Matrix_real::squere_Matrix_real(int n, std::initializer_list<float> values) noexcept {
+Matrix::Matrix(int n, std::initializer_list<float> values) noexcept {
+    is_compute_det = false;
     if (n > 0) {
         n_ = n;
+        m_ = n;
         matrix_.assign(n*n, 0);
         matrix_ = values;
+        type_figure = matrix_type::SQUERE;
+        type_struct = matrix_type::COMMON;        
     }
     else {
         n_ = 0;
+        m_ = 0;
         std::cout << "The matrix size is 0. Try 'reset' with valid data...\n ";
     }
 }
 
-squere_Matrix_real squere_Matrix_real::operator+(const squere_Matrix_real & matrix2) noexcept {
-    squere_Matrix_real current(this->get_size());
-    
-    if (this->get_size() != matrix2.get_size()) {std::cout << "invalid size...\n"; return current;}
-
-    int count = n_*n_ / 8;    //используем _m256, вмещающим 8 int and 8 float
-
-    int remainder = (n_*n_) % 8;
-
-    for (int i{}; i < count; i++) {
-        __m256 vec_a = _mm256_loadu_ps(this->first_el() + 8*i);
-        __m256 vec_b = _mm256_loadu_ps(matrix2.first_el() + 8*i);
-
-        __m256 result = _mm256_add_ps(vec_a, vec_b);
-
-        _mm256_storeu_ps(current.first_el_non_const() + 8*i, result);
-    }
-    
-    for (int j{}; j < remainder; j++) {
-        *(current.first_el_non_const() + 8*count + j) = *(this->first_el() + 8*count + j) + *(matrix2.first_el() + 8*count + j);
-    }
-
-    return current;
-}
-
-squere_Matrix_real squere_Matrix_real::operator-(const squere_Matrix_real & matrix2) noexcept {
-    squere_Matrix_real current(this->get_size());
-    
-    if (this->get_size() != matrix2.get_size()) {std::cout << "invalid size...\n"; return current;}
-
-    int count = n_*n_ / 8;    //используем _m256, вмещающим 8 int and 8 float
-
-    int remainder = (n_*n_) % 8;
-
-    for (int i{}; i < count; i++) {
-        __m256 vec_a = _mm256_loadu_ps(this->first_el() + 8*i);
-        __m256 vec_b = _mm256_loadu_ps(matrix2.first_el() + 8*i);
-
-        __m256 result = _mm256_sub_ps(vec_a, vec_b);
-
-        _mm256_storeu_ps(current.first_el_non_const() + 8*i, result);
-    }
-    
-    for (int j{}; j < remainder; j++) {
-        *(current.first_el_non_const() + 8*count + j) = *(this->first_el() + 8*count + j) - *(matrix2.first_el() + 8*count + j);
-    }
-
-    return current;
-}
-
-const squere_Matrix_real squere_Matrix_real::transpose_new() const {
-    squere_Matrix_real current(this->get_size());
-    for (int i{}; i < n_; i++) {
-        for (int j{}; j < n_; j++) {
-            *(current.first_el_iter() + n_*i + j) = matrix_[n_*j + i];
-        }
-    }
-    return current;
-}
-
-const float & squere_Matrix_real::operator()(int i, int j) const {
-    return this->matrix_[n_*i + j];
-}
-
-void squere_Matrix_real::show() const {
-    for (int i{};i < n_; i++) {
-        for (int j{}; j < n_; j++) {
-            std::cout << std::setw(15) << matrix_[n_*i + j] << " ";
-        }
-        std::cout << "\n";
-    }
-    std::cout << "\n";
-}
-
-
-void squere_Matrix_real::transpose() {
-	for (int i{}; i < n_; i++) {
-		for (int j{i+1}; j < n_; j++) {
-			std::swap(*(matrix_.begin() + n_ * i + j), *(matrix_.begin() + n_ * j + i));
- 		}
-	}
-}
-
-
-void squere_Matrix_real::swap_row(int i, int j) {
-	std::swap_ranges(matrix_.begin() + n_ * (i-1), matrix_.begin() + n_ * (i-1) + n_, matrix_.begin() + n_ * (j-1));
-}
-
-void squere_Matrix_real::swap_col(int i, int j) {
-	for (int row = 0; row < n_; ++row) {
-		std::swap(matrix_[n_ * row + i-1], matrix_[n_ * row + j-1]);
-	}
-}  
-
-float squere_Matrix_real::determinant_1() {
-    int count_swap = 0;
-	for (int i{}; i < n_ - 1; i++) {   //в каждой строке ищем ведущий элемент
-		auto max_el_iter = std::max_element(matrix_.cbegin() + n_ * i + i, matrix_.cbegin() + n_ * i + n_, [](float a, float b) {return std::abs(a) < std::abs(b); });
-		int max_el_index = std::distance(matrix_.cbegin() + n_ * i, max_el_iter);     //i-й столбец мы будем умножать на отношение i-го элемента и ведущего, чтобы получить 0 на i-й позиции.
-		if (max_el_index != i) {this->swap_col(i, max_el_index); count_swap++;}    //если ведущий элемент не на диагонали - меняем столбцы. 
- 		this->transpose();   //транспонируем для реализации преобразования столбцов через непрерывные блоки, чтобы использовать SIMD. строка - это непрерывный блок
-		for (int j{ i + 1 }; j < n_; j++) {    //текущий столбец мы не меняем, с помощью него меняем все остальные
-			if (std::abs(matrix_[n_ * i + i]) < 1e-9) {determinant = 0; return determinant;}    //если ведущий слишокм маленький, считаем, что весь столбец обнулен
-			float rat = matrix_[n_ * j + i] / matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
-			if (n_ - i >= 8) {    //условность только для выбора SIMD
-				int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
-				int remainder = (n_ - i) % 8;   //сколько значений остается
-				for (int k{}; k < count; k++) {
-					__m256 vec_a = _mm256_loadu_ps(&matrix_[n_ * i + i + 8*k]);
-					__m256 multiplier = _mm256_set1_ps(rat);
-					__m256 vec_b = _mm256_loadu_ps(&matrix_[n_ * j + i + 8*k]);
-					__m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
-					_mm256_storeu_ps(&matrix_[n_ * j + i + 8*k], vec_c);
-				}
-				for (int k{}; k < remainder; k++) {
-					matrix_[n_ * j + i + 8 * count + k] -= matrix_[n_ * i + i + 8 * count + k] * rat;
-				}
-			}
-			else if ((n_ - i >= 4) && (n_ - i < 8)) {
-				int count = (n_ - i) / 4;
-				int remainder = (n_ - i) % 4;
-				for (int k{}; k < count; k++) {
-					__m128 vec_a = _mm_loadu_ps(&matrix_[n_ * i + i + 4 * k]);
-					__m128 multiplier = _mm_set_ps1(rat);
-					__m128 vec_b = _mm_loadu_ps(&matrix_[n_ * j + i + 4 * k]);
-					__m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
-					_mm_storeu_ps(&matrix_[n_ * j + i + 4 * k], vec_c);
-				}
-				for (int k{}; k < remainder; k++) {
-					matrix_[n_ * j + i + 4 * count + k] -= matrix_[n_ * i + i + 4 * count + k] * rat;
-				}
-			}
-			else if (n_ - i <= 3) {
-                for (int k{i}; k < n_;k++) {
-                    matrix_[n_*j + k] -= matrix_[i*n_ + k] * rat;
-                }
-			}
-		}
-		this->transpose();
-	}
-    this->show();
-	determinant = 1.;
-	for (int i{}; i < n_; i++) {
-		determinant *= matrix_[n_ * i + i];
-	}
-    if (count_swap % 2 == 1) determinant *= -1;
-    return determinant;
-} 
-
-int squere_Matrix_real::to_up_triang() {
-    int count_swap = 0;
-	std::vector<float> i_element_row(n_, 0.);
-
-	for (int i{}; i < n_-1; i++) {
-		for (int j{}; j < n_-i; j++) {
-			i_element_row[i + j] = matrix_[n_ * i + i + n_ * j];  //j задает номер строки
-		}
-
-		auto max_element_row_iter = std::max_element(i_element_row.begin() + i, i_element_row.end(), [](float a, float b) {return std::abs(a) < std::abs(b); });
-		int max_element_row_num = std::distance(i_element_row.begin(), max_element_row_iter);
-		if (i != max_element_row_num) {
-            this->swap_row(i, max_element_row_num);   //привели к ведущему элементу.
-            count_swap++;   
-        }
-        if (std::abs(matrix_[n_ * i + i]) < 1e-11) continue; //{determinant = 0.; return determinant;}  //если ведущий слишокм маленький, считаем, что весь столбец обнулен
-		for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
-			float rat = matrix_[n_ * j + i] / matrix_[n_ * i + i];   //отношение текущего элемента и ведушего
-			if (n_ - i >= 8) {    //условность только для выбора SIMD
-				int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
-				int remainder = (n_ - i) % 8;   //сколько значений остается
-				for (int k{}; k < count; k++) {
-					__m256 vec_a = _mm256_loadu_ps(&matrix_[n_ * i + i + 8 * k]);
-					__m256 multiplier = _mm256_set1_ps(rat);
-					__m256 vec_b = _mm256_loadu_ps(&matrix_[n_ * j + i + 8 * k]);
-					__m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
-					_mm256_storeu_ps(&matrix_[n_ * j + i + 8 * k], vec_c);
-				}
-				for (int k{}; k < remainder; k++) {
-					matrix_[n_ * j + i + 8 * count + k] -= matrix_[n_ * i + i + 8 * count + k] * rat;
-				}
-			}
-			else if ((n_ - i >= 4) && (n_ - i < 8)) {
-				int count = (n_ - i) / 4;
-				int remainder = (n_ - i) % 4;
-				for (int k{}; k < count; k++) {
-					__m128 vec_a = _mm_loadu_ps(&matrix_[n_ * i + i + 4 * k]);
-					__m128 multiplier = _mm_set_ps1(rat);
-					__m128 vec_b = _mm_loadu_ps(&matrix_[n_ * j + i + 4 * k]);
-					__m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
-					_mm_storeu_ps(&matrix_[n_ * j + i + 4 * k], vec_c);
-				}
-				for (int k{}; k < remainder; k++) {
-					matrix_[n_ * j + i + 4 * count + k] -= matrix_[n_ * i + i + 4 * count + k] * rat;
-				}
-			}
-			else {
-				for (int k{ i }; k < n_; k++) {
-					matrix_[n_ * j + k] -= matrix_[n_*i + k] * rat;
-				}
-			}
-		}
-	}
-    return count_swap;
-} 
-
-float squere_Matrix_real::determinant_2() {
-    squere_Matrix_real current = *this;
-    int c = current.to_up_triang();
-
-    determinant = 1.;
-	for (int i{}; i < n_; i++) {
-		determinant *= current.matrix_[n_ * i + i];
-	}
-    if (c % 2 == 1 && (determinant)) determinant *= -1;
-    return determinant;
-}
-
-void squere_Matrix_real::init_random() {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dist(0, 1.);
-    for (int i{}; i < n_; i++) {
-        for (int j{}; j < n_; j++){
-            matrix_[n_*i + j] = dist(gen);
-        }
-    }
-}
-
-squere_Matrix_real squere_Matrix_real::except_ij_row_col(int i, int j) const {
-    squere_Matrix_real current (n_-1, 0.);
-    for (int g{}; g < current.get_size();g++) {
-        for (int h{}; h < current.get_size(); h++) {
-            if (h < j and g < i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g, h);
-            else if (h < j and g >= i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g+1, h);
-            else if (h >= j and g < i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g, h+1);
-            else if (h >= j and g >= i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g+1, h+1);
-        }
-    }
-
-    return current;
-}
-
-
-squere_Matrix_real squere_Matrix_real::reverse() {
-    squere_Matrix_real reverse_matrix (n_, 0.);
-    this->determinant_2();
-    if (this->determinant != 0) {
-    algebraic_addition M;
-    for (int i{}; i < n_; i++) {
-        for (int j{}; j< n_; j++) {
-
-            M.signum = ((i + j) % 2 == 0 ? 1 : -1 );
-            M.minor = (this->except_ij_row_col(i, j)).determinant_2();
-
-            reverse_matrix.matrix_[n_*i + j] = M.signum * M.minor; 
-        }
-    }
-    reverse_matrix.transpose();
-    for (auto & i : reverse_matrix.matrix_) {i*= 1/(this->determinant);};
-    }
-    else std::cout << "error.The determinant is zero...\n";
-    return reverse_matrix;
-}
-
-squere_Matrix_real squere_Matrix_real::construct_transform_matrix(int i, int j, float value) {
-	squere_Matrix_real current(n_, matrix_type::IDENTITY);
-	current.matrix_[n_ * i + j] = value;
-	return current;
-}
-
-std::vector<squere_Matrix_real> squere_Matrix_real::LU_decomposition() {
-
-    std::vector<squere_Matrix_real> a{squere_Matrix_real (n_, matrix_type::IDENTITY), *this};
-	for (int i{}; i < n_ - 1; i++) {
-		for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
-			if (std::abs((a[1]).matrix_[n_ * i + i]) < 1e-11) continue;//если ведущий слишокм маленький, считаем, что весь столбец обнулен
-			float rat = (a[1]).matrix_[n_ * j + i] / (a[1]).matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
-			if (n_ - i >= 8) {    //условность только для выбора SIMD
-				int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
-				int remainder = (n_ - i) % 8;   //сколько значений остается
-				for (int k{}; k < count; k++) {
-					__m256 vec_a = _mm256_loadu_ps(&((a[1]).matrix_[n_ * i + i + 8 * k]));
-					__m256 multiplier = _mm256_set1_ps(rat);
-					__m256 vec_b = _mm256_loadu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]));
-					__m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
-					_mm256_storeu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]), vec_c);
-
-                    vec_a = _mm256_loadu_ps(&((a[0]).matrix_[n_ * i + i + 8 * k]));
-					multiplier = _mm256_set1_ps(rat);
-					vec_b = _mm256_loadu_ps(&((a[0]).matrix_[n_ * j + i + 8 * k]));
-					vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
-					_mm256_storeu_ps(&((a[0]).matrix_[n_ * j + i + 8 * k]), vec_c);
-				}
-				for (int k{}; k < remainder; k++) {
-					(a[1]).matrix_[n_ * j + i + 8 * count + k] -= (a[1]).matrix_[n_ * i + i + 8 * count + k] * rat;
-                    (a[0]).matrix_[n_ * j + i + 8 * count + k] -= (a[0]).matrix_[n_ * i + i + 8 * count + k] * rat;
-				}
-			}
-			else if ((n_ - i >= 4) && (n_ - i < 8)) {
-				int count = (n_ - i) / 4;
-				int remainder = (n_ - i) % 4;
-				for (int k{}; k < count; k++) {
-					__m128 vec_a = _mm_loadu_ps(&((a[1]).matrix_[n_ * i + i + 4 * k]));
-					__m128 multiplier = _mm_set_ps1(rat);
-					__m128 vec_b = _mm_loadu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]));
-					__m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
-					_mm_storeu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]), vec_c);
-
-                    vec_a = _mm_loadu_ps(&((a[0]).matrix_[n_ * i + i + 4 * k]));
-					multiplier = _mm_set_ps1(rat);
-					vec_b = _mm_loadu_ps(&((a[0]).matrix_[n_ * j + i + 4 * k]));
-					vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
-					_mm_storeu_ps(&((a[0]).matrix_[n_ * j + i + 4 * k]), vec_c);
-				}
-				for (int k{}; k < remainder; k++) {
-					(a[1]).matrix_[n_ * j + i + 4 * count + k] -= (a[1]).matrix_[n_ * i + i + 4 * count + k] * rat;
-                    (a[0]).matrix_[n_ * j + i + 4 * count + k] -= (a[0]).matrix_[n_ * i + i + 4 * count + k] * rat;
-				}
-			}
-			else {
-				for (int k{ i }; k < n_; k++) {
-					(a[1]).matrix_[n_ * j + k] -= (a[1]).matrix_[n_ * i + k] * rat;
-				}
-                for (int k{}; k < n_; k++) {
-					(a[0]).matrix_[n_ * j + k] -= (a[0]).matrix_[n_ * i + k] * rat;
-				}
-			}
-		}
-	}
-    return a;
-}
-
-rectang_Matrix::rectang_Matrix(int n, int m) noexcept {
+Matrix::Matrix(int n, int m) noexcept {
+    is_compute_det = false;
     if (n > 0 && m > 0) {
         matrix_.assign(m*n, 0);
         n_ = n; m_ = m;
-        type = matrix_type::RECTANG;
+        type_figure = matrix_type::RECTANG;
+        type_struct = matrix_type::COMMON;
     }
-    else std::cout << "invalid size.../n";
+    else  {
+        std::cout << "invalid size.../n";
+        m_ = 0;
+        n_ = 0;
+    }
 }
 
-rectang_Matrix::rectang_Matrix(int n, int m, std::initializer_list<float> values) noexcept {
+Matrix::Matrix(int n, int m, std::initializer_list<float> values) noexcept {
+    is_compute_det = false;
     if (n > 0 && m > 0) {
         matrix_.assign(m*n, 0);
         int count{};
@@ -452,16 +160,21 @@ rectang_Matrix::rectang_Matrix(int n, int m, std::initializer_list<float> values
             *(matrix_.begin() + i) = *(values.begin() + i);
         }
         n_ = n; m_ = m;
-        type = matrix_type::RECTANG;
+        type_figure = matrix_type::RECTANG;
+        type_struct = matrix_type::COMMON;
     }
-    else std::cout << "invalid size.../n";
+    else  {
+        std::cout << "invalid size.../n";
+        m_ = 0;
+        n_ = 0;
+    }
 }
 
 
-rectang_Matrix rectang_Matrix::operator*(const rectang_Matrix & right) noexcept {
-    rectang_Matrix result(n_, right.n_);
+Matrix Matrix::operator*(const Matrix & right) noexcept {
+    Matrix result(n_, right.m_);
 
-    if (m_ = right.m_) {
+    if (m_ == right.n_) {
         if (m_ >= 8) {
             int count = m_ / 8;
             int remainder = m_ % 8;
@@ -515,7 +228,7 @@ rectang_Matrix rectang_Matrix::operator*(const rectang_Matrix & right) noexcept 
         else {
             float sum{};
             for (int i{}; i < n_; i++) {
-                for (int j{}; j < right.n_; j++) {
+                for (int j{}; j < right.m_; j++) {
                     sum = 0;
                     for (int k{}; k < m_; k++) {
                         sum += matrix_[m_ * i + k] * right.matrix_[right.m_ * j + k];
@@ -531,8 +244,8 @@ rectang_Matrix rectang_Matrix::operator*(const rectang_Matrix & right) noexcept 
     return result;
 }
 
-rectang_Matrix rectang_Matrix::operator+(const rectang_Matrix & matrix2) noexcept {
-    rectang_Matrix current(*this);
+Matrix Matrix::operator+(const Matrix & matrix2) noexcept {
+    Matrix current(*this);
     
     if (this->get_size() == matrix2.get_size()) {
         int count = n_*m_ / 8;    //используем _m256, вмещающим 8 int and 8 float
@@ -556,8 +269,8 @@ rectang_Matrix rectang_Matrix::operator+(const rectang_Matrix & matrix2) noexcep
     return current;
 }
 
-rectang_Matrix rectang_Matrix::operator-(const rectang_Matrix & matrix2) noexcept {
-    rectang_Matrix current(*this);
+Matrix Matrix::operator-(const Matrix & matrix2) noexcept {
+    Matrix current(*this);
     
     if (this->get_size() == matrix2.get_size()) {
         int count = n_*m_ / 8;    //используем _m256, вмещающим 8 int and 8 float
@@ -581,8 +294,8 @@ rectang_Matrix rectang_Matrix::operator-(const rectang_Matrix & matrix2) noexcep
 }
 
 
-const rectang_Matrix rectang_Matrix::transpose_new() const {
-    rectang_Matrix current(m_, n_);
+const Matrix Matrix::transpose_new() const {
+    Matrix current(m_, n_);
     for (int i{}; i < n_; i++) {
         for (int j{}; j < m_; j++) {
             current.matrix_[n_*j + i] = matrix_[m_*i + j];
@@ -591,11 +304,11 @@ const rectang_Matrix rectang_Matrix::transpose_new() const {
     return current;
 }
 
-const float & rectang_Matrix::operator()(int i, int j) const {
+const float & Matrix::operator()(int i, int j) const {
     return this->matrix_[m_*i + j];
 }
 
-void rectang_Matrix::show() const {
+void Matrix::show() const {
     for (int i{};i < n_; i++) {
         for (int j{}; j < m_; j++) {
             std::cout << std::setw(15) << matrix_[m_*i + j] << " ";
@@ -606,16 +319,241 @@ void rectang_Matrix::show() const {
 }
 
 
-void rectang_Matrix::swap_row(int i, int j) {
-	std::swap_ranges(matrix_.begin() + m_ * (i -1), matrix_.begin() + m_ * (i-1) + m_, matrix_.begin() + m_ * (j-1));
+void Matrix::swap_row(int i, int j) {
+	std::swap_ranges(matrix_.begin() + m_ * i, matrix_.begin() + m_ * i + m_, matrix_.begin() + m_ * j);
 }
 
-void rectang_Matrix::swap_col(int i, int j) {
+void Matrix::swap_col(int i, int j) {
     for (int row = 0; row < n_; ++row) {
-		std::swap(matrix_[m_ * row + i - 1], matrix_[m_ * row + j - 1]);
+		std::swap(matrix_[m_ * row + i], matrix_[m_ * row + j]);
 	}
 }
 
+int Matrix::to_up_triang() {
+    if (type_figure == matrix_type::SQUERE) {
+        int count_swap = 0;
+        std::vector<float> i_element_row(n_, 0.);
 
+        for (int i{}; i < n_-1; i++) {
+            for (int j{}; j < n_-i; j++) {
+                i_element_row[i + j] = matrix_[n_ * i + i + n_ * j];  //j задает номер строки
+            }
+
+            auto max_element_row_iter = std::max_element(i_element_row.begin() + i, i_element_row.end(), [](float a, float b) {return std::abs(a) < std::abs(b); });
+            int max_element_row_num = std::distance(i_element_row.begin(), max_element_row_iter);
+            if (i != max_element_row_num) {
+                this->swap_row(i, max_element_row_num);   //привели к ведущему элементу.
+                count_swap++;   
+            }
+            if (std::abs(matrix_[n_ * i + i]) < 1e-11) continue; //{determinant = 0.; return determinant;}  //если ведущий слишокм маленький, считаем, что весь столбец обнулен
+            for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
+                float rat = matrix_[n_ * j + i] / matrix_[n_ * i + i];   //отношение текущего элемента и ведушего
+                if (n_ - i >= 8) {    //условность только для выбора SIMD
+                    int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
+                    int remainder = (n_ - i) % 8;   //сколько значений остается
+                    for (int k{}; k < count; k++) {
+                        __m256 vec_a = _mm256_loadu_ps(&matrix_[n_ * i + i + 8 * k]);
+                        __m256 multiplier = _mm256_set1_ps(rat);
+                        __m256 vec_b = _mm256_loadu_ps(&matrix_[n_ * j + i + 8 * k]);
+                        __m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
+                        _mm256_storeu_ps(&matrix_[n_ * j + i + 8 * k], vec_c);
+                    }
+                    for (int k{}; k < remainder; k++) {
+                        matrix_[n_ * j + i + 8 * count + k] -= matrix_[n_ * i + i + 8 * count + k] * rat;
+                    }
+                }
+                else if ((n_ - i >= 4) && (n_ - i < 8)) {
+                    int count = (n_ - i) / 4;
+                    int remainder = (n_ - i) % 4;
+                    for (int k{}; k < count; k++) {
+                        __m128 vec_a = _mm_loadu_ps(&matrix_[n_ * i + i + 4 * k]);
+                        __m128 multiplier = _mm_set_ps1(rat);
+                        __m128 vec_b = _mm_loadu_ps(&matrix_[n_ * j + i + 4 * k]);
+                        __m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
+                        _mm_storeu_ps(&matrix_[n_ * j + i + 4 * k], vec_c);
+                    }
+                    for (int k{}; k < remainder; k++) {
+                        matrix_[n_ * j + i + 4 * count + k] -= matrix_[n_ * i + i + 4 * count + k] * rat;
+                    }
+                }
+                else {
+                    for (int k{ i }; k < n_; k++) {
+                        matrix_[n_ * j + k] -= matrix_[n_*i + k] * rat;
+                    }
+                }
+            }
+        }
+        return count_swap;
+    }
+    else {
+        std::cout << "cannot transform rectangular matrix...\n";
+        return 0;
+    }
+} 
+
+float Matrix::det() {
+    if (type_figure == matrix_type::SQUERE) {
+        Matrix current = *this;
+        int c = current.to_up_triang();
+
+        determinant = 1.;
+        for (int i{}; i < n_; i++) {
+            determinant *= current.matrix_[n_ * i + i];
+        }
+        if (c % 2 == 1 && (determinant)) determinant *= -1;
+        is_compute_det = true;
+        return determinant;
+    }
+    else {
+        std::cout << "cannot find a det for rectangular matrix...\n";
+        return 0;
+    }
+    
+}
+
+void Matrix::init_random() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist(0, 1.);
+    for (int i{}; i < n_; i++) {
+        for (int j{}; j < m_; j++){
+            matrix_[m_*i + j] = dist(gen);
+        }
+    }
+}
+
+Matrix Matrix::except_ij_row_col(int i, int j) const {
+    if (type_figure == matrix_type::SQUERE) {
+        Matrix current (n_-1, (float)0.);
+        for (int g{}; g < current.get_size();g++) {
+            for (int h{}; h < current.get_size(); h++) {
+                if (h < j and g < i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g, h);
+                else if (h < j and g >= i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g+1, h);
+                else if (h >= j and g < i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g, h+1);
+                else if (h >= j and g >= i) *(current.first_el_iter() + (n_-1)*g + h) = this->operator()(g+1, h+1);
+            }
+        }
+        return current;
+    }
+    else {
+        std::cout << "only for squere matrixes\n";
+        return *this;
+    }
+}
+
+
+Matrix Matrix::reverse() {
+    if (type_figure == matrix_type::SQUERE) {
+        Matrix reverse_matrix (n_, (float)0.);
+        if (is_compute_det == false) this->det();
+        float d = this->determinant; 
+        if (d != 0) {
+        algebraic_addition M;
+        for (int i{}; i < n_; i++) {
+            for (int j{}; j< n_; j++) {
+
+                M.signum = ((i + j) % 2 == 0 ? 1 : -1 );
+                M.minor = (this->except_ij_row_col(i, j)).det();
+
+                reverse_matrix.matrix_[n_*i + j] = M.signum * M.minor; 
+            }
+        }
+        reverse_matrix = reverse_matrix.transpose_new();
+        for (auto & i : reverse_matrix.matrix_) {i*= 1/d;};
+        }
+        else std::cout << "error.The determinant is zero...\n";
+        return reverse_matrix;
+    }
+    else {
+        std::cout << "reverse matrix is exist only for squere matrixes...\n";
+        return *this;
+    }
+}
+
+std::vector<Matrix> Matrix::LU_decomposition() {
+    if (type_figure == matrix_type::SQUERE) {
+        std::vector<Matrix> a{Matrix (n_, matrix_type::IDENTITY), *this};
+        for (int i{}; i < n_ - 1; i++) {
+            for (int j{ i + 1 }; j < n_; j++) {    //текущую строку мы не меняем, с помощью нее меняем все остальные
+                if (std::abs((a[1]).matrix_[n_ * i + i]) < 1e-11) continue;//если ведущий слишокм маленький, считаем, что весь столбец обнулен
+                float rat = (a[1]).matrix_[n_ * j + i] / (a[1]).matrix_[n_ * i + i];   //олтношение текущего элемента и ведушего
+                if (n_ - i >= 8) {    //условность только для выбора SIMD
+                    int count = (n_ - i) / 8;   //сколько целых 256 битных блоков занимае строка
+                    int remainder = (n_ - i) % 8;   //сколько значений остается
+                    for (int k{}; k < count; k++) {
+                        __m256 vec_a = _mm256_loadu_ps(&((a[1]).matrix_[n_ * i + i + 8 * k]));
+                        __m256 multiplier = _mm256_set1_ps(rat);
+                        __m256 vec_b = _mm256_loadu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]));
+                        __m256 vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
+                        _mm256_storeu_ps(&((a[1]).matrix_[n_ * j + i + 8 * k]), vec_c);
+
+                        vec_a = _mm256_loadu_ps(&((a[0]).matrix_[n_ * i + i + 8 * k]));
+                        multiplier = _mm256_set1_ps(rat);
+                        vec_b = _mm256_loadu_ps(&((a[0]).matrix_[n_ * j + i + 8 * k]));
+                        vec_c = _mm256_sub_ps(vec_b, _mm256_mul_ps(vec_a, multiplier));
+                        _mm256_storeu_ps(&((a[0]).matrix_[n_ * j + i + 8 * k]), vec_c);
+                    }
+                    for (int k{}; k < remainder; k++) {
+                        (a[1]).matrix_[n_ * j + i + 8 * count + k] -= (a[1]).matrix_[n_ * i + i + 8 * count + k] * rat;
+                        (a[0]).matrix_[n_ * j + i + 8 * count + k] -= (a[0]).matrix_[n_ * i + i + 8 * count + k] * rat;
+                    }
+                }
+                else if ((n_ - i >= 4) && (n_ - i < 8)) {
+                    int count = (n_ - i) / 4;
+                    int remainder = (n_ - i) % 4;
+                    for (int k{}; k < count; k++) {
+                        __m128 vec_a = _mm_loadu_ps(&((a[1]).matrix_[n_ * i + i + 4 * k]));
+                        __m128 multiplier = _mm_set_ps1(rat);
+                        __m128 vec_b = _mm_loadu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]));
+                        __m128 vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
+                        _mm_storeu_ps(&((a[1]).matrix_[n_ * j + i + 4 * k]), vec_c);
+
+                        vec_a = _mm_loadu_ps(&((a[0]).matrix_[n_ * i + i + 4 * k]));
+                        multiplier = _mm_set_ps1(rat);
+                        vec_b = _mm_loadu_ps(&((a[0]).matrix_[n_ * j + i + 4 * k]));
+                        vec_c = _mm_sub_ps(vec_b, _mm_mul_ps(vec_a, multiplier));
+                        _mm_storeu_ps(&((a[0]).matrix_[n_ * j + i + 4 * k]), vec_c);
+                    }
+                    for (int k{}; k < remainder; k++) {
+                        (a[1]).matrix_[n_ * j + i + 4 * count + k] -= (a[1]).matrix_[n_ * i + i + 4 * count + k] * rat;
+                        (a[0]).matrix_[n_ * j + i + 4 * count + k] -= (a[0]).matrix_[n_ * i + i + 4 * count + k] * rat;
+                    }
+                }
+                else {
+                    for (int k{ i }; k < n_; k++) {
+                        (a[1]).matrix_[n_ * j + k] -= (a[1]).matrix_[n_ * i + k] * rat;
+                    }
+                    for (int k{}; k < n_; k++) {
+                        (a[0]).matrix_[n_ * j + k] -= (a[0]).matrix_[n_ * i + k] * rat;
+                    }
+                }
+            }
+        }
+        return a;
+    }
+
+    else {
+        std::cout << "only for squere matrixes...\n";
+        return std::vector<Matrix> ({0, 0});
+    }
+}
+
+
+float scalar_product(const std::vector<float> & x, Matrix& G, const std::vector<float> & y) {  //invoking matrix as Gram's matrix.
+    if (x.size() == y.size() && x.size() == G.col_count()) {    //input data - vectors 1xn
+        int n{x.size()};
+        float dot{};
+        for (int i{}; i < n; i++) {
+            for (int j{}; j < n; j++) {
+                dot += x[j] * (*(G.first_el_iter() + n*i + j)) * y[i];  
+            }
+        }
+        return dot;
+    }
+    else {
+        std::cout << "dimentions is not equal\n";
+        return 0;
+    }
+}
 
 
