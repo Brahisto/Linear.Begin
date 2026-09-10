@@ -8,10 +8,9 @@
 #include <algorithm>
 #include <random>
 #include <initializer_list>
+#include "Vector.h"
 
-
-using matrix = std::vector<float>;
-using start_pos = matrix::iterator;
+using start_pos = std::vector<float>::const_iterator;
 
 enum class matrix_type {UP_TRIANG, LOW_TRIANG, IDENTITY, ZERO, SQUERE, RECTANG, COMMON, DIAGONAL};
 
@@ -19,7 +18,7 @@ enum class matrix_type {UP_TRIANG, LOW_TRIANG, IDENTITY, ZERO, SQUERE, RECTANG, 
 class Matrix {
     int n_;
     int m_;
-    matrix matrix_;
+    std::vector<float> matrix_;
     float determinant = 0;    //default value
     matrix_type type_figure;
     matrix_type type_struct;
@@ -43,6 +42,7 @@ public:
     Matrix operator+(const Matrix &) noexcept;
     Matrix operator-(const Matrix &) noexcept;
     Matrix operator*(const Matrix &) noexcept;
+    void operator*(const float) noexcept;
 
     const float& operator()(int, int) const;
 
@@ -62,13 +62,17 @@ public:
 
     const float * first_el() const {return &matrix_[0];}
     float * first_el_non_const() {return &matrix_[0];}
-    start_pos first_el_iter() {return matrix_.begin();}
+    start_pos first_el_iter() const {return matrix_.begin();}
     std::vector<Matrix> LU_decomposition();
 
     void show() const;
     
     int row_count() const {return n_;}
     int col_count() const {return m_;}
+    void orthogonalization(const Matrix &);  //inside realization is based on row-transforming. If start basis presented as 
+    //vectors-columns you need to transpose this matrix.
+
+    float ort_check(int, int, const Matrix &);
 };
 
 float scalar_product(const std::vector<float> &, const Matrix &, const std::vector<float> &);     // the arguments is vectors. Similar realization is motivated by
@@ -79,6 +83,4 @@ struct algebraic_addition {
     float minor;
 };
 
-
-#include "Matrix.tpp"
 

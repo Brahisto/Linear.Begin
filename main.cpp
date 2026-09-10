@@ -2,21 +2,14 @@
 
 int main() {
 
-    std::initializer_list<float> a = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-    squere_Matrix_real m2(3, a);
+    Matrix some (3, {1, 0, 0, 0, 1, 0, 0, 0, 1});
+    some.show();
+    Matrix Gram (3, {3, 0, 2, 0, 5, 3, 2, 3, 6});
+    some.orthogonalization(Gram);
 
+    float c = some.ort_check(2, 3, Gram);
 
-    std::vector<squere_Matrix_real> LU {squere_Matrix_real (3), squere_Matrix_real (3)};
-
-    LU = m2.LU_decomposition();
-
-    squere_Matrix_real m4(3);
-    m4 = LU[0] * LU[1];
-
-    LU[0].show();
-    LU[1].show();
-
-    m4.show();
+    std::cout << c;
 
     return 0;
 }
